@@ -5,27 +5,30 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#07111f">
   <title>Прайс монтажників</title>
-  <link rel="stylesheet" href="style.css?v=6">
+  <link rel="stylesheet" href="style.css?v=7">
 </head>
 <body>
   <main class="app">
     <header class="topbar">
       <div>
-        <div class="eyebrow">Колективний прайс монтажників</div>
-        <h1>Ціни від монтажників</h1>
-        <p class="subtitle">Вкажіть свою ціну — система покаже середню ціну по всій групі.</p>
+        <div class="eyebrow" data-i18n="eyebrow">Колективний прайс монтажників</div>
+        <h1 data-i18n="title">Ціни від монтажників</h1>
+        <p class="subtitle" data-i18n="subtitle">Вкажіть свою ціну — система покаже середню ціну по всій групі.</p>
       </div>
-      <div class="lang"><b>UK</b><span>RU</span><span>EN</span></div>
+      <div class="lang" aria-label="Мова">
+        <button type="button" class="langBtn active" data-lang="uk">UA</button>
+        <button type="button" class="langBtn" data-lang="en">EN</button>
+      </div>
     </header>
-    <section id="dbStatus" class="notice"><strong>Підключення</strong><span>Завантаження спільної бази…</span></section>
-    <form id="addForm" class="searchRow"><input id="search" type="search" placeholder="Пошук позиції..." autocomplete="off"><button type="button" id="addBtn">+ Запропонувати</button></form>
-    <div class="privacy"><span>🔒</span><span><b>Анонімно для інших</b><br>Інші учасники бачать лише середню ціну, а не вашу конкретну ціну.</span></div>
-    <section id="prices" class="cards"></section><div id="empty" class="empty hidden">Нічого не знайдено.</div>
-    <section id="adminPanel" class="adminPanel hidden"><div class="adminHeader"><div><div class="eyebrow">Кабінет</div><h2>Заявки на нові позиції</h2></div><button id="adminRefresh" class="secondary">Оновити</button></div><div id="adminList" class="adminList"></div><div id="adminEmpty" class="empty">Нових заявок немає.</div><div class="adminAdd"><h3>Додати позицію вручну</h3><input id="adminName" placeholder="Назва профілю / полотна"><div class="adminFields"><input id="adminCategory" placeholder="Категорія (необов'язково)"><input id="adminUnit" placeholder="Одиниця (необов'язково)"></div><button id="adminAddBtn" class="primary">Додати в прайс</button></div></section>
-    <footer><button id="adminBtn" class="adminLink">🔐 Адміністратор</button><span> · Прайс монтажників · версія 2.0</span></footer>
+    <section id="dbStatus" class="notice"><strong data-i18n="connecting">Підключення</strong><span data-i18n="loading">Завантаження спільної бази…</span></section>
+    <form id="addForm" class="searchRow"><input id="search" type="search" data-i18n-placeholder="search" placeholder="Пошук позиції..." autocomplete="off"><button type="button" id="addBtn" data-i18n="suggest">+ Запропонувати</button></form>
+    <div class="privacy"><span>🔒</span><span><b data-i18n="anonymousTitle">Анонімно для інших</b><br><span data-i18n="anonymousText">Інші учасники бачать лише середню ціну, а не вашу конкретну ціну.</span></span></div>
+    <section id="prices" class="cards"></section><div id="empty" class="empty hidden" data-i18n="empty">Нічого не знайдено.</div>
+    <section id="adminPanel" class="adminPanel hidden"><div class="adminHeader"><div><div class="eyebrow" data-i18n="cabinet">Кабінет</div><h2 data-i18n="requestsTitle">Заявки на нові позиції</h2></div><button id="adminRefresh" class="secondary" data-i18n="refresh">Оновити</button></div><div id="adminList" class="adminList"></div><div id="adminEmpty" class="empty" data-i18n="noRequests">Нових заявок немає.</div><div class="adminAdd"><h3 data-i18n="manualAdd">Додати позицію вручну</h3><input id="adminName" data-i18n-placeholder="positionName" placeholder="Назва профілю / полотна"><div class="adminFields"><input id="adminCategory" data-i18n-placeholder="category" placeholder="Категорія (необов'язково)"><input id="adminUnit" data-i18n-placeholder="unit" placeholder="Одиниця (необов'язково)"></div><button id="adminAddBtn" class="primary" data-i18n="addToPrice">Додати в прайс</button></div></section>
+    <footer><button id="adminBtn" class="adminLink">🔐 <span data-i18n="admin">Адміністратор</span></button><span> · <span data-i18n="footer">Прайс монтажників · версія 2.0</span></span></footer>
   </main>
-  <dialog id="modal"><form method="dialog" id="suggestForm" class="modal"><button class="close" value="cancel" aria-label="Закрити">×</button><h2>Запропонувати позицію</h2><p class="modalHint">Напишіть профіль, полотно або іншу позицію, яку варто додати в колективний прайс. Після перевірки адміністратора вона з'явиться для голосування.</p><label>Назва позиції<input id="suggestName" required maxlength="160" placeholder="Напр. Профіль ПК-14"></label><button class="primary" value="default">Відправити заявку</button></form></dialog>
-  <dialog id="adminModal"><form method="dialog" id="adminLoginForm" class="modal"><button class="close" value="cancel" aria-label="Закрити">×</button><h2>Кабінет адміністратора</h2><p class="modalHint">Введіть код адміністратора.</p><label>Код<input id="adminCode" required type="password" autocomplete="off" placeholder="Код адміністратора"></label><button class="primary" value="default">Увійти</button></form></dialog>
-  <script src="app-v5.js?v=6"></script>
+  <dialog id="modal"><form method="dialog" id="suggestForm" class="modal"><button class="close" value="cancel" aria-label="Закрити">×</button><h2 data-i18n="suggestTitle">Запропонувати позицію</h2><p class="modalHint" data-i18n="suggestHint">Напишіть профіль, полотно або іншу позицію, яку варто додати в колективний прайс. Після перевірки адміністратора вона з'явиться для голосування.</p><label data-i18n="positionLabel">Назва позиції<input id="suggestName" required maxlength="160" data-i18n-placeholder="example" placeholder="Напр. Профіль ПК-14"></label><button class="primary" value="default" data-i18n="sendRequest">Відправити заявку</button></form></dialog>
+  <dialog id="adminModal"><form method="dialog" id="adminLoginForm" class="modal"><button class="close" value="cancel" aria-label="Закрити">×</button><h2 data-i18n="adminCabinet">Кабінет адміністратора</h2><p class="modalHint" data-i18n="adminHint">Введіть код адміністратора.</p><label data-i18n="codeLabel">Код<input id="adminCode" required type="password" autocomplete="off" data-i18n-placeholder="adminCodePlaceholder" placeholder="Код адміністратора"></label><button class="primary" value="default" data-i18n="login">Увійти</button></form></dialog>
+  <script src="app-v5.js?v=7"></script>
 </body>
 </html>
