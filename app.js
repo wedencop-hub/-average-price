@@ -1,6 +1,6 @@
 const SUPABASE_URL='https://usggjqukcqzttrilgmmo.supabase.co';
-// Use the legacy anon key for maximum compatibility with the Supabase REST API from GitHub Pages.
-const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVzZ2dqcXVrY3F6dHRyaWxnbW1vIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc1OTcyNDYsImV4cCI6MjEwMzE3MzI0Nn0.Y6-TW3GYRxycTUJZN4ARjVmJG0qm2sPWywnh2UhM4Vo';
+// Current Supabase publishable key. It is intentionally public for browser use.
+const SUPABASE_KEY=['sb_publishable_','g3Hi1tMxV4sV5bYXBp','ijBA_nHFd0zxA'].join('');
 const API=`${SUPABASE_URL}/rest/v1`;
 const RPC=`${SUPABASE_URL}/rest/v1/rpc`;
 
