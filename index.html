@@ -25,26 +25,49 @@
 
     <form id="addForm" class="searchRow">
       <input id="search" type="search" placeholder="Пошук позиції..." autocomplete="off">
-      <button type="button" id="addBtn">+ Додати</button>
+      <button type="button" id="addBtn">+ Запропонувати</button>
     </form>
 
     <div class="privacy"><span>🔒</span><span><b>Анонімно для інших</b><br>Інші учасники бачать лише середню ціну, а не вашу конкретну ціну.</span></div>
 
     <section id="prices" class="cards"></section>
-
     <div id="empty" class="empty hidden">Нічого не знайдено.</div>
 
-    <footer>Прайс монтажників · версія 1.0</footer>
+    <section id="adminPanel" class="adminPanel hidden">
+      <div class="adminHeader"><div><div class="eyebrow">Кабінет</div><h2>Заявки на нові позиції</h2></div><button id="adminRefresh" class="secondary">Оновити</button></div>
+      <div id="adminList" class="adminList"></div>
+      <div id="adminEmpty" class="empty">Нових заявок немає.</div>
+      <div class="adminAdd">
+        <h3>Додати позицію вручну</h3>
+        <input id="adminName" placeholder="Назва профілю / полотна">
+        <div class="adminFields"><input id="adminCategory" placeholder="Категорія (необов'язково)"><input id="adminUnit" placeholder="Одиниця (необов'язково)"></div>
+        <button id="adminAddBtn" class="primary">Додати в прайс</button>
+      </div>
+    </section>
+
+    <footer><button id="adminBtn" class="adminLink">🔐 Адміністратор</button><span> · Прайс монтажників · версія 2.0</span></footer>
   </main>
+
   <dialog id="modal">
-    <form method="dialog" id="priceForm" class="modal">
+    <form method="dialog" id="suggestForm" class="modal">
       <button class="close" value="cancel" aria-label="Закрити">×</button>
-      <h2>Додати позицію</h2>
-      <label>Назва позиції<input id="name" required placeholder="Напр. Плівка MSD 3.20 м"></label>
-      <label>Ваша ціна, грн<input id="price" required type="number" min="1" step="1" placeholder="1280"></label>
-      <button class="primary" value="default">Зберегти ціну</button>
+      <h2>Запропонувати позицію</h2>
+      <p class="modalHint">Напишіть профіль, полотно або іншу позицію, яку варто додати в колективний прайс. Після перевірки адміністратора вона з'явиться для голосування.</p>
+      <label>Назва позиції<input id="suggestName" required maxlength="160" placeholder="Напр. Профіль ПК-14"></label>
+      <button class="primary" value="default">Відправити заявку</button>
     </form>
   </dialog>
+
+  <dialog id="adminModal">
+    <form method="dialog" id="adminLoginForm" class="modal">
+      <button class="close" value="cancel" aria-label="Закрити">×</button>
+      <h2>Кабінет адміністратора</h2>
+      <p class="modalHint">Введіть код адміністратора.</p>
+      <label>Код<input id="adminCode" required type="password" autocomplete="off" placeholder="Код адміністратора"></label>
+      <button class="primary" value="default">Увійти</button>
+    </form>
+  </dialog>
+
   <script src="app.js"></script>
 </body>
 </html>
