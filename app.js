@@ -1,5 +1,6 @@
 const SUPABASE_URL='https://usggjqukcqzttrilgmmo.supabase.co';
-// Current Supabase publishable key. It is intentionally public for browser use.
+// Supabase publishable key. For publishable keys we send it via `apikey` only;
+// it is NOT a JWT and must not be put into `Authorization: Bearer ...`.
 const SUPABASE_KEY=['sb_publishable_','g3Hi1tMxV4sV5bYXBp','ijBA_nHFd0zxA'].join('');
 const API=`${SUPABASE_URL}/rest/v1`;
 const RPC=`${SUPABASE_URL}/rest/v1/rpc`;
@@ -24,17 +25,21 @@ function makeVisitorId(){
 function money(n){return new Intl.NumberFormat('uk-UA').format(Math.round(n))}
 function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 
+function headers(extra={}){
+  return {apikey:SUPABASE_KEY,'Content-Type':'application/json',...(extra||{})};
+}
+
 async function api(path,options={}){
   const res=await fetch(`${API}/${path}`,{
     ...options,
-    headers:{apikey:SUPABASE_KEY,Authorization:`Bearer ${SUPABASE_KEY}`,'Content-Type':'application/json',...(options.headers||{})}
+    headers:headers(options.headers)
   });
   if(!res.ok){const text=await res.text();throw new Error(text||`HTTP ${res.status}`)}
   const text=await res.text();
   return text?JSON.parse(text):null;
 }
 async function rpc(name,body){
-  const res=await fetch(`${RPC}/${name}`,{method:'POST',headers:{apikey:SUPABASE_KEY,Authorization:`Bearer ${SUPABASE_KEY}`,'Content-Type':'application/json'},body:JSON.stringify(body)});
+  const res=await fetch(`${RPC}/${name}`,{method:'POST',headers:headers(),body:JSON.stringify(body)});
   if(!res.ok){const text=await res.text();throw new Error(text||`HTTP ${res.status}`)}
   const text=await res.text();return text?JSON.parse(text):null;
 }
