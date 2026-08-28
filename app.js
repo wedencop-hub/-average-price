@@ -1,5 +1,6 @@
 const SUPABASE_URL='https://usggjqukcqzttrilgmmo.supabase.co';
-const SUPABASE_KEY='sb_publishable_g3Hi1tMxV4sV5bYXBpijBA_nHFd0zxA';
+// Use the legacy anon key for maximum compatibility with the Supabase REST API from GitHub Pages.
+const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVzZ2dqcXVrY3F6dHRyaWxnbW1vIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc1OTcyNDYsImV4cCI6MjEwMzE3MzI0Nn0.Y6-TW3GYRxycTUJZN4ARjVmJG0qm2sPWywnh2UhM4Vo';
 const API=`${SUPABASE_URL}/rest/v1`;
 const RPC=`${SUPABASE_URL}/rest/v1/rpc`;
 
@@ -101,7 +102,6 @@ prices.addEventListener('change',e=>{
   savePrice(s.dataset.id,Number(s.value));
 });
 
-// Public suggestion form: users only submit a name. Admin decides whether it becomes a voting item.
 document.querySelector('#addBtn').onclick=()=>modal.showModal();
 document.querySelector('#suggestForm').addEventListener('submit',async e=>{
   e.preventDefault();
@@ -114,7 +114,6 @@ document.querySelector('#suggestForm').addEventListener('submit',async e=>{
   }catch(err){console.error(err);setStatus('Не вдалося відправити заявку. Спробуйте ще раз.',false)}
 });
 
-// Admin cabinet. The code is checked in Supabase; it is not stored in the page source.
 document.querySelector('#adminBtn').onclick=()=>{
   if(adminCode){adminPanel.classList.remove('hidden');loadAdminSuggestions();adminPanel.scrollIntoView({behavior:'smooth'});}
   else adminModal.showModal();
@@ -148,7 +147,7 @@ document.querySelector('#adminList').addEventListener('click',async e=>{
     if(b.classList.contains('accept')) await rpc('admin_accept_price_suggestion',{p_admin_code:adminCode,p_suggestion_id:b.dataset.id});
     else await rpc('admin_reject_price_suggestion',{p_admin_code:adminCode,p_suggestion_id:b.dataset.id});
     await loadAdminSuggestions();await loadItems();
-  }catch(err){console.error(err);alert('Не вдалося виконати дію. Перевірте сесію адміністратора.')} 
+  }catch(err){console.error(err);alert('Не вдалося виконати дію. Перевірте сесію адміністратора.')}
 });
 document.querySelector('#adminAddBtn').onclick=async()=>{
   const name=document.querySelector('#adminName').value.trim();if(name.length<2)return;
