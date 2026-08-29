@@ -19,15 +19,14 @@ async function priceApi(action,body={}){const r=await fetch(PRICE_API,{method:'P
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function money(n){return new Intl.NumberFormat(lang==='uk'?'uk-UA':'en-US').format(Math.round(Number(n)||0))}
 function setStatus(text,ok){statusBox.innerHTML=`<strong>${ok?tr('connected'):tr('connecting')}</strong><span>${esc(text)}</span>`;statusBox.classList.toggle('ok',!!ok)}
-async function loadItems(){setStatus(tr('loading'),false);try{const rows=await rpc('get_price_list',{p_telegram_user_id:visitorId});items=(rows||[]).map(x=>({...x,average_price:Number(x.average_price)||0,votes_count:Number(x.votes_count)||0}));setStatus(tr('connected'),true);render()}catch(e){console.error('PRICE LIST ERROR',e);setStatus('Помилка підключення до бази. Перезавантажте сторінку.',false)}}
-function render(){const q=search.value.trim().toLowerCase(),list=items.filter(x=>String(x.name).toLowerCase().includes(q));prices.innerHTML='';$('#empty').classList.toggle('hidden',list.length>0);for(const x of list){const mine=Number.isFinite(myPrices[x.id])?myPrices[x.id]:null;const value=mine??(x.average_price||10);const avg=x.average_price||0;const pct=Math.max(1,Math.min(100,avg/5000*100));const el=document.createElement('article');el.className='card';el.innerHTML=`<div class="cardHead"><div><h2>${esc(x.name)}</h2>${x.category||x.unit?`<div class="meta">${esc([x.category,x.unit].filter(Boolean).join(' · '))}</div>`:''}</div><span class="votes">${x.votes_count} ${tr('votes')}</span></div><div class="stats"><div><div class="label">${tr('mine')}</div><div class="value" data-my-value="${x.id}">${mine==null?'—':money(mine)+' UAH'}</div></div><div><div class="label">${tr('average')}</div><div class="value">${x.votes_count?money(avg)+' UAH':'—'}</div></div></div><div class="bar"><div class="fill" style="width:${pct}%"></div></div><div class="sliderRow"><span>10</span><input class="priceSlider" data-id="${x.id}" type="range" min="10" max="5000" step="10" value="${value}"><span>5000</span></div><div class="sliderCurrent"><span>${tr('yourPrice')}</span><b data-slider-value="${x.id}">${money(value)} UAH</b></div><div class="cardActions"><button data-id="${x.id}" data-action="lower">${tr('lower')}</button><button data-id="${x.id}" data-action="higher">${tr('higher')}</button></div>`;prices.appendChild(el)}}
+async function loadItems(){setStatus(tr('loading'),false);try{const rows=await rpc('get_price_list',{p_telegram_user_id:visitorId});items=(rows||[]).map(x=>({...x,average_price:Number(x.average_price)||0,votes_count:Number(x.votes_count)||0,my_price:Number(x.my_price)||0}));for(const x of items){if(x.my_price>0){myPrices[x.id]=x.my_price}}localStorage.setItem('myPriceVotes',JSON.stringify(myPrices));setStatus(tr('connected'),true);render()}catch(e){console.error('PRICE LIST ERROR',e);setStatus('Помилка підключення до бази. Перезавантажте сторінку.',false)}}
+function render(){const q=search.value.trim().toLowerCase(),list=items.filter(x=>String(x.name).toLowerCase().includes(q));prices.innerHTML='';$('#empty').classList.toggle('hidden',list.length>0);for(const x of list){const mine=Number.isFinite(myPrices[x.id])?myPrices[x.id]:(x.my_price>0?x.my_price:null);const value=mine??(x.average_price||10);const avg=x.average_price||0;const pct=Math.max(1,Math.min(100,avg/5000*100));const el=document.createElement('article');el.className='card';el.innerHTML=`<div class="cardHead"><div><h2>${esc(x.name)}</h2>${x.category||x.unit?`<div class="meta">${esc([x.category,x.unit].filter(Boolean).join(' · '))}</div>`:''}</div><span class="votes">${x.votes_count} ${tr('votes')}</span></div><div class="stats"><div><div class="label">${tr('mine')}</div><div class="value" data-my-value="${x.id}">${mine==null?'—':money(mine)+' UAH'}</div></div><div><div class="label">${tr('average')}</div><div class="value">${x.votes_count?money(avg)+' UAH':'—'}</div></div></div><div class="bar"><div class="fill" style="width:${pct}%"></div></div><div class="sliderRow"><span>10</span><input class="priceSlider" data-id="${x.id}" type="range" min="10" max="5000" step="10" value="${value}"><span>5000</span></div><div class="sliderCurrent"><span>${tr('yourPrice')}</span><b data-slider-value="${x.id}">${money(value)} UAH</b></div><div class="cardActions"><button data-id="${x.id}" data-action="lower">${tr('lower')}</button><button data-id="${x.id}" data-action="higher">${tr('higher')}</button></div>`;prices.appendChild(el)}}
 async function savePrice(id,value){value=Math.max(10,Math.min(5000,Math.round(Number(value)/10)*10));try{await rpc('submit_price_vote',{p_item_id:id,p_telegram_user_id:visitorId,p_price:value});myPrices[id]=value;localStorage.setItem('myPriceVotes',JSON.stringify(myPrices));await loadItems()}catch(e){console.error('SAVE PRICE ERROR',e);setStatus(tr('saveError'),false)}}
 prices.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;const id=b.dataset.id,x=items.find(i=>i.id===id);if(!x)return;const cur=Number.isFinite(myPrices[id])?myPrices[id]:(x.average_price||10);savePrice(id,cur+(b.dataset.action==='higher'?10:-10))});
 prices.addEventListener('input',e=>{const s=e.target.closest('.priceSlider');if(!s)return;const c=s.closest('.card'),id=s.dataset.id,v=Number(s.value);c.querySelector(`[data-slider-value="${id}"]`).textContent=`${money(v)} UAH`;c.querySelector(`[data-my-value="${id}"]`).textContent=`${money(v)} UAH`});
 prices.addEventListener('change',e=>{const s=e.target.closest('.priceSlider');if(s)savePrice(s.dataset.id,s.value)});
 
 $('#addBtn').onclick=()=>modal.showModal();
-// Add the initial price field to the existing suggestion dialog without requiring another HTML deployment.
 const suggestForm=$('#suggestForm');
 if(suggestForm&&!$('#suggestPrice')){
   const label=document.createElement('label');
@@ -39,20 +38,7 @@ if(suggestForm&&!$('#suggestPrice')){
   const submit=suggestForm.querySelector('.primary');
   suggestForm.insertBefore(label,submit);
 }
-suggestForm.addEventListener('submit',async e=>{
-  e.preventDefault();
-  const name=$('#suggestName').value.trim();
-  const price=Number($('#suggestPrice')?.value);
-  if(name.length<2||!Number.isInteger(price)||price<10||price>5000||price%10!==0){setStatus('Вкажіть назву та ціну від 10 до 5000 грн з кроком 10 грн.',false);return;}
-  const btn=e.target.querySelector('.primary');
-  if(btn){btn.disabled=true;btn.textContent='Відправлення…'}
-  try{
-    await priceApi('suggest',{text:name,price});
-    e.target.reset();modal.close();
-    setStatus(tr('sent'),true);
-  }catch(err){console.error('SUGGEST ERROR',err);setStatus(tr('sendError'),false)}
-  finally{if(btn){btn.disabled=false;btn.textContent='Відправити заявку'}}
-});
+suggestForm.addEventListener('submit',async e=>{e.preventDefault();const name=$('#suggestName').value.trim();const price=Number($('#suggestPrice')?.value);if(name.length<2||!Number.isInteger(price)||price<10||price>5000||price%10!==0){setStatus('Вкажіть назву та ціну від 10 до 5000 грн з кроком 10 грн.',false);return}const btn=e.target.querySelector('.primary');if(btn){btn.disabled=true;btn.textContent='Відправлення…'}try{await priceApi('suggest',{text:name,price});e.target.reset();modal.close();setStatus(tr('sent'),true)}catch(err){console.error('SUGGEST ERROR',err);setStatus(tr('sendError'),false)}finally{if(btn){btn.disabled=false;btn.textContent='Відправити заявку'}}});
 
 const adminBtn=$('#adminBtn');
 if(adminBtn&&!isAdmin){adminBtn.style.display='none';}
