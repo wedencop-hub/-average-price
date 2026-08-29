@@ -1,6 +1,7 @@
 const SUPABASE_URL='https://usggjqukcqzttrilgmmo.supabase.co';
 const SUPABASE_KEY='sb_publishable_g3Hi1tMxV4sV5bYXBpijBA_nHFd0zxA';
 const API=`${SUPABASE_URL}/rest/v1`;
+const PRICE_API=`${SUPABASE_URL}/functions/v1/price-api`;
 const $=s=>document.querySelector(s);
 const prices=$('#prices'),search=$('#search'),modal=$('#modal'),statusBox=$('#dbStatus'),adminPanel=$('#adminPanel');
 const tg=window.Telegram?.WebApp||null;
@@ -14,6 +15,7 @@ const T={uk:{connecting:'Підключення',loading:'Завантаженн
 const tr=k=>T[lang]?.[k]||T.uk[k]||k;
 function headers(){return{apikey:SUPABASE_KEY,'Content-Type':'application/json'}}
 async function rpc(name,body){const r=await fetch(`${API}/rpc/${name}`,{method:'POST',headers:headers(),body:JSON.stringify(body)});const t=await r.text();if(!r.ok)throw new Error(t||`HTTP ${r.status}`);return t?JSON.parse(t):null}
+async function priceApi(action,body={}){const r=await fetch(PRICE_API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action,...body,p_telegram_user_id:visitorId,initData:tg?.initData||''})});const t=await r.text();if(!r.ok)throw new Error(t||`HTTP ${r.status}`);return t?JSON.parse(t):null}
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function money(n){return new Intl.NumberFormat(lang==='uk'?'uk-UA':'en-US').format(Math.round(Number(n)||0))}
 function setStatus(text,ok){statusBox.innerHTML=`<strong>${ok?tr('connected'):tr('connecting')}</strong><span>${esc(text)}</span>`;statusBox.classList.toggle('ok',!!ok)}
@@ -23,16 +25,43 @@ async function savePrice(id,value){value=Math.max(10,Math.min(5000,Math.round(Nu
 prices.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;const id=b.dataset.id,x=items.find(i=>i.id===id);if(!x)return;const cur=Number.isFinite(myPrices[id])?myPrices[id]:(x.average_price||10);savePrice(id,cur+(b.dataset.action==='higher'?10:-10))});
 prices.addEventListener('input',e=>{const s=e.target.closest('.priceSlider');if(!s)return;const c=s.closest('.card'),id=s.dataset.id,v=Number(s.value);c.querySelector(`[data-slider-value="${id}"]`).textContent=`${money(v)} UAH`;c.querySelector(`[data-my-value="${id}"]`).textContent=`${money(v)} UAH`});
 prices.addEventListener('change',e=>{const s=e.target.closest('.priceSlider');if(s)savePrice(s.dataset.id,s.value)});
+
 $('#addBtn').onclick=()=>modal.showModal();
-$('#suggestForm').addEventListener('submit',async e=>{e.preventDefault();const name=$('#suggestName').value.trim();if(name.length<2)return;const btn=e.target.querySelector('.primary');if(btn){btn.disabled=true;btn.textContent='Відправлення…'}try{await rpc('submit_price_suggestion',{p_text:name,p_telegram_user_id:visitorId});e.target.reset();modal.close();setStatus(tr('sent'),true)}catch(err){console.error('SUGGEST ERROR',err);setStatus(tr('sendError'),false)}finally{if(btn){btn.disabled=false;btn.textContent='Відправити заявку'}}});
+// Add the initial price field to the existing suggestion dialog without requiring another HTML deployment.
+const suggestForm=$('#suggestForm');
+if(suggestForm&&!$('#suggestPrice')){
+  const label=document.createElement('label');
+  label.setAttribute('data-i18n','suggestPriceLabel');
+  label.textContent=lang==='uk'?'Ваша ціна':'Your price';
+  const input=document.createElement('input');
+  input.id='suggestPrice';input.type='number';input.required=true;input.min='10';input.max='5000';input.step='10';input.inputMode='numeric';input.placeholder=lang==='uk'?'Напр. 250':'e.g. 250';
+  label.appendChild(input);
+  const submit=suggestForm.querySelector('.primary');
+  suggestForm.insertBefore(label,submit);
+}
+suggestForm.addEventListener('submit',async e=>{
+  e.preventDefault();
+  const name=$('#suggestName').value.trim();
+  const price=Number($('#suggestPrice')?.value);
+  if(name.length<2||!Number.isInteger(price)||price<10||price>5000||price%10!==0){setStatus('Вкажіть назву та ціну від 10 до 5000 грн з кроком 10 грн.',false);return;}
+  const btn=e.target.querySelector('.primary');
+  if(btn){btn.disabled=true;btn.textContent='Відправлення…'}
+  try{
+    await priceApi('suggest',{text:name,price});
+    e.target.reset();modal.close();
+    setStatus(tr('sent'),true);
+  }catch(err){console.error('SUGGEST ERROR',err);setStatus(tr('sendError'),false)}
+  finally{if(btn){btn.disabled=false;btn.textContent='Відправити заявку'}}
+});
+
 const adminBtn=$('#adminBtn');
 if(adminBtn&&!isAdmin){adminBtn.style.display='none';}
 if(adminBtn&&isAdmin){adminBtn.style.display='inline-flex';adminBtn.onclick=()=>{adminPanel.classList.remove('hidden');loadAdminSuggestions();adminPanel.scrollIntoView({behavior:'smooth'})};}
-async function loadAdminSuggestions(){if(!isAdmin)return;const list=$('#adminList'),empty=$('#adminEmpty');try{const data=await rpc('admin_list_price_suggestions',{p_admin_code:visitorId});list.innerHTML='';empty.classList.toggle('hidden',!!data?.length);(data||[]).forEach(s=>{const el=document.createElement('div');el.className='request';el.innerHTML=`<div><b>${esc(s.text)}</b><div class="requestMeta">${tr('request')} · ${new Date(s.created_at).toLocaleString(lang==='uk'?'uk-UA':'en-US')}</div></div><div class="requestActions"><button class="accept" data-id="${s.id}">${tr('accept')}</button><button class="reject" data-id="${s.id}">${tr('reject')}</button></div>`;list.appendChild(el)})}catch(e){console.error('ADMIN LIST ERROR',e);alert(tr('adminAction'))}}
+async function loadAdminSuggestions(){if(!isAdmin)return;const list=$('#adminList'),empty=$('#adminEmpty');try{const data=await rpc('admin_list_price_suggestions',{p_admin_code:visitorId});list.innerHTML='';empty.classList.toggle('hidden',!!data?.length);(data||[]).forEach(s=>{const el=document.createElement('div');el.className='request';el.innerHTML=`<div><b>${esc(s.text)}</b><div class="requestMeta">${tr('request')} · ${s.proposed_price?money(s.proposed_price)+' грн · ':''}${new Date(s.created_at).toLocaleString(lang==='uk'?'uk-UA':'en-US')}</div></div><div class="requestActions"><button class="accept" data-id="${s.id}">${tr('accept')}</button><button class="reject" data-id="${s.id}">${tr('reject')}</button></div>`;list.appendChild(el)})}catch(e){console.error('ADMIN LIST ERROR',e);alert(tr('adminAction'))}}
 $('#adminRefresh').onclick=()=>{if(isAdmin)loadAdminSuggestions()};
 $('#adminList').addEventListener('click',async e=>{const b=e.target.closest('button');if(!b||!isAdmin)return;try{if(b.classList.contains('accept'))await rpc('admin_accept_price_suggestion',{p_admin_code:visitorId,p_suggestion_id:b.dataset.id});else await rpc('admin_reject_price_suggestion',{p_admin_code:visitorId,p_suggestion_id:b.dataset.id});await loadAdminSuggestions();await loadItems()}catch(err){console.error(err);alert(tr('adminAction'))}});
 $('#adminAddBtn').onclick=async()=>{if(!isAdmin)return;const name=$('#adminName').value.trim();if(name.length<2)return;try{await rpc('admin_add_price_item',{p_admin_code:visitorId,p_name:name,p_category:$('#adminCategory').value.trim()||null,p_unit:$('#adminUnit').value.trim()||null});$('#adminName').value='';$('#adminCategory').value='';$('#adminUnit').value='';await loadItems();await loadAdminSuggestions()}catch(e){console.error(e);alert(tr('adminAddError'))}};
 search.addEventListener('input',render);
-document.querySelectorAll('.langBtn').forEach(b=>b.onclick=()=>{lang=b.dataset.lang;localStorage.setItem('averagePriceLang',lang);document.documentElement.lang=lang;search.placeholder=tr('search');render()});
+document.querySelectorAll('.langBtn').forEach(b=>b.onclick=()=>{lang=b.dataset.lang;localStorage.setItem('averagePriceLang',lang);document.documentElement.lang=lang;search.placeholder=tr('search');const p=$('#suggestPrice');if(p)p.placeholder=lang==='uk'?'Напр. 250':'e.g. 250';render()});
 search.placeholder=tr('search');
 loadItems();
