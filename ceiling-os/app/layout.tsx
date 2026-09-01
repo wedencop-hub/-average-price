@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import './globals.css';
-import RegisterServiceWorker from './offline/register-sw';
+import { RegisterServiceWorker } from './offline/register-sw';
 
 export const metadata: Metadata = {
   title: 'СТЕЛЯ OS — операційна система бізнесу натяжних стель',
