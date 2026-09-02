@@ -1,0 +1,3 @@
+import type {CeilingDrawing} from "./ceiling-model";
+export async function apiGetDrawing(objectId:string){const r=await fetch(`/api/objects/${encodeURIComponent(objectId)}/drawing`);if(!r.ok)throw new Error("DRAWING_READ_FAILED");const d=await r.json();return (d.drawing?.payload??null) as CeilingDrawing|null}
+export async function apiSaveDrawing(objectId:string,drawing:CeilingDrawing){const r=await fetch(`/api/objects/${encodeURIComponent(objectId)}/drawing`,{method:"PUT",headers:{"content-type":"application/json"},body:JSON.stringify({drawing})});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error??"DRAWING_SAVE_FAILED");return d.drawing as {id:string;version:number;payload:CeilingDrawing};}
