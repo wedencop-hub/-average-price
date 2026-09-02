@@ -1,11 +1,14 @@
+"use client";
 import Link from "next/link";
+import {useEffect,useState} from "react";
+
+type Metrics={objects:string;active:string;completed:string;revenue:string;expenses:string;profit:string;receivables:string;payroll:string;low_stock:string};
 const modules=[
- ["Об’єкти","Керуйте замірами, кошторисами та монтажами","/objects"],
+ ["Об’єкти","Заміри, клієнти, кошториси та монтажи","/objects"],
  ["Конструктор","Намалюйте стелю та отримайте розрахунок","/constructor"],
- ["Склад","Залишки, закупівельні ціни та мінімальний запас","/warehouse"],
- ["Кошториси","Окремо для клієнта та внутрішньої собівартості","#"],
- ["Виробництво","Специфікації, комплектація та видача","#"],
- ["Монтаж","Завдання, фото, контроль якості та зарплата","#"],
- ["Фінанси","Доходи, витрати, прибуток та рух коштів","#"],
+ ["Склад","Залишки, резерви, списання та мінімальний запас","/warehouse"],
+ ["Виробництво","Специфікації, резерв та видача матеріалів","/objects"],
+ ["Монтаж","Бригади, правила оплати та зарплата","/objects"],
+ ["Фінанси","Доходи, витрати, прибуток та дебіторка","/objects"],
 ] as const;
-export default function HomePage(){return <main className="shell"><section className="hero"><div className="mark">С</div><div><div className="eyebrow">🇺🇦 СТЕЛЯ OS</div><h1>Операційна система бізнесу натяжних стель</h1><p>Замірив → намалював → отримав розрахунок → відправив клієнту.</p></div></section><section className="grid">{modules.map(([title,text,href])=><Link className="card" href={href} key={title}><div className="card-title">{title}</div><div className="card-text">{text}</div>{href!=="#"&&<div className="card-link">Відкрити →</div>}</Link>)}</section><section className="status"><span className="dot"/> Конструктор, кошторис та офлайн-склад доступні</section></main>}
+export default function HomePage(){const[m,setM]=useState<Metrics|null>(null);const[offline,setOffline]=useState(false);useEffect(()=>{fetch("/api/dashboard",{cache:"no-store"}).then(async r=>{if(!r.ok)throw new Error();const d=await r.json();if(!d.ok)throw new Error();setM(d.metrics)}).catch(()=>setOffline(true))},[]);return <main className="shell"><section className="hero"><div className="mark">С</div><div><div className="eyebrow">🇺🇦 СТЕЛЯ OS</div><h1>Операційна система бізнесу натяжних стель</h1><p>Замірив → намалював → отримав розрахунок → відправив клієнту.</p></div></section>{m&&<section className="grid" style={{marginBottom:24}}><article className="card"><div className="card-title">{Number(m.objects)} об’єктів</div><div className="card-text">{Number(m.active)} у роботі · {Number(m.completed)} завершено</div></article><article className="card"><div className="card-title">{Number(m.revenue).toLocaleString("uk-UA")} ₴</div><div className="card-text">Виручка за актуальними кошторисами</div></article><article className="card"><div className="card-title">{Number(m.profit).toLocaleString("uk-UA")} ₴</div><div className="card-text">Розрахунковий прибуток</div></article><article className="card"><div className="card-title">{Number(m.receivables).toLocaleString("uk-UA")} ₴</div><div className="card-text">Залишок до оплати</div></article></section>}{offline&&<section className="status"><span className="dot"/> Серверні показники поки недоступні — модулі продовжують працювати в офлайн-режимі</section>}<section className="grid">{modules.map(([title,text,href])=><Link className="card" href={href} key={title}><div className="card-title">{title}</div><div className="card-text">{text}</div><div className="card-link">Відкрити →</div></Link>)}</section><section className="status"><span className="dot"/> Ядро СТЕЛЯ OS: Telegram auth · CRM · конструктор · кошторис · склад · виробництво · фінанси</section></main>}
