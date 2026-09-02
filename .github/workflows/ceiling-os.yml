@@ -1,0 +1,29 @@
+name: CEILING OS CI
+
+on:
+  pull_request:
+    paths:
+      - 'ceiling-os/**'
+      - '.github/workflows/ceiling-os.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'ceiling-os/**'
+      - '.github/workflows/ceiling-os.yml'
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ceiling-os
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: ceiling-os/package.json
+      - run: npm install --no-audit --no-fund
+      - run: npm run typecheck
+      - run: npm run build
