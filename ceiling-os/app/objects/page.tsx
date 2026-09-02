@@ -1,0 +1,42 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { listClients, listObjects, saveClient, saveObject, type Client, type ObjectRecord, type ObjectStatus } from "../../lib/crm-model";
+
+const companyId = "demo-company";
+const statusLabels: Record<ObjectStatus, string> = { lead: "Лід", measurement: "Замір", estimate: "Кошторис", contract: "Договір", deposit_paid: "Аванс", production: "Виробництво", ready: "Готово", delivery: "Доставка", installation: "Монтаж", completed: "Завершено", cancelled: "Скасовано" };
+
+export default function ObjectsPage() {
+  const [clients, setClients] = useState<Client[]>([]);
+  const [objects, setObjects] = useState<ObjectRecord[]>([]);
+  const [clientName, setClientName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [title, setTitle] = useState("");
+  const [address, setAddress] = useState("");
+  const [selectedClientId, setSelectedClientId] = useState("");
+  const [status, setStatus] = useState<ObjectStatus>("lead");
+  const [message, setMessage] = useState("");
+
+  function reload() { setClients(listClients(companyId)); setObjects(listObjects(companyId)); }
+  useEffect(() => reload(), []);
+
+  function createClient() {
+    if (!clientName.trim() || !phone.trim()) return setMessage("Вкажіть ім’я та телефон клієнта");
+    const now = new Date().toISOString(); const client: Client = { id: crypto.randomUUID(), companyId, name: clientName.trim(), phone: phone.trim(), createdAt: now, updatedAt: now };
+    saveClient(client); setClientName(""); setPhone(""); setSelectedClientId(client.id); reload(); setMessage("Клієнта створено");
+  }
+  function createObject() {
+    if (!selectedClientId || !title.trim() || !address.trim()) return setMessage("Оберіть клієнта та заповніть назву й адресу");
+    const now = new Date().toISOString(); saveObject({ id: crypto.randomUUID(), companyId, clientId: selectedClientId, title: title.trim(), address: address.trim(), status, createdAt: now, updatedAt: now });
+    setTitle(""); setAddress(""); reload(); setMessage("Об’єкт створено");
+  }
+
+  return <main className="objects-page"><header><div className="eyebrow">СТЕЛЯ OS</div><h1>Об’єкти</h1><p>Клієнти, заміри та робочий статус кожного об’єкта.</p></header>
+    <section className="object-grid">
+      <article className="panel"><h2>Новий клієнт</h2><input placeholder="Ім’я клієнта" value={clientName} onChange={(e) => setClientName(e.target.value)} /><input placeholder="Телефон" value={phone} onChange={(e) => setPhone(e.target.value)} /><button onClick={createClient}>Додати клієнта</button></article>
+      <article className="panel"><h2>Новий об’єкт</h2><select value={selectedClientId} onChange={(e) => setSelectedClientId(e.target.value)}><option value="">Оберіть клієнта</option>{clients.map((client) => <option key={client.id} value={client.id}>{client.name} · {client.phone}</option>)}</select><input placeholder="Назва об’єкта" value={title} onChange={(e) => setTitle(e.target.value)} /><input placeholder="Адреса" value={address} onChange={(e) => setAddress(e.target.value)} /><select value={status} onChange={(e) => setStatus(e.target.value as ObjectStatus)}>{Object.entries(statusLabels).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select><button onClick={createObject}>Створити об’єкт</button></article>
+    </section>
+    {message && <div className="object-message">{message}</div>}
+    <section className="panel"><h2>Мої об’єкти <span>{objects.length}</span></h2>{objects.length === 0 ? <p className="empty">Поки немає об’єктів. Створіть першого клієнта та об’єкт.</p> : <div className="object-list">{objects.map((object) => { const client = clients.find((item) => item.id === object.clientId); return <article className="object-row" key={object.id}><div><strong>{object.title}</strong><span>{client?.name ?? "Клієнт"} · {object.address}</span></div><b>{statusLabels[object.status]}</b></article>; })}</div>}</section>
+  </main>;
+}
