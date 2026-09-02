@@ -26,7 +26,7 @@ export default function HomePage() {
           </article>
         ))}
       </section>
-      <section className="status"><span className="dot" /> Основа системи готова до підключення Telegram та Supabase</section>
+      <section className="status"><span className="dot" /> Конструктор та офлайн-розрахунок доступні</section>
     </main>
   );
 }
