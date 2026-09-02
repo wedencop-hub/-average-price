@@ -1,0 +1,18 @@
+"use client";
+
+import Link from "next/link";
+import { useEffect, useState } from "react";
+import { listClients, listObjects, saveObject, type Client, type ObjectRecord, type ObjectStatus } from "../../../lib/crm-model";
+import { getOffline } from "../../../lib/offline-store";
+import type { CeilingDrawing } from "../../../lib/ceiling-model";
+
+const companyId = "demo-company";
+const labels: Record<ObjectStatus,string> = {lead:"Лід",measurement:"Замір",estimate:"Кошторис",contract:"Договір",deposit_paid:"Аванс",production:"Виробництво",ready:"Готово",delivery:"Доставка",installation:"Монтаж",completed:"Завершено",cancelled:"Скасовано"};
+
+export default function ObjectDetail({ params }: { params: Promise<{ id: string }> }) {
+  const [id,setId]=useState(""); const [object,setObject]=useState<ObjectRecord|null>(null); const [client,setClient]=useState<Client|null>(null); const [drawing,setDrawing]=useState<CeilingDrawing|null>(null);
+  useEffect(()=>{ params.then(({id:routeId})=>{ setId(routeId); const found=listObjects(companyId).find(item=>item.id===routeId); if(found){setObject(found);setClient(listClients(companyId).find(item=>item.id===found.clientId)??null); getOffline<CeilingDrawing>(`drawing:${routeId}`).then(setDrawing).catch(()=>setDrawing(null));} }); },[params]);
+  if(!object) return <main className="object-detail"><p>Об’єкт не знайдено.</p><Link href="/objects">← До об’єктів</Link></main>;
+  function setStatus(status:ObjectStatus){ const updated={...object,status,updatedAt:new Date().toISOString()}; saveObject(updated); setObject(updated); }
+  return <main className="object-detail"><Link href="/objects">← До об’єктів</Link><header><div className="eyebrow">ОБ’ЄКТ</div><h1>{object.title}</h1><p>{object.address}</p></header><section className="detail-grid"><article className="panel"><h2>Клієнт</h2><strong>{client?.name??"—"}</strong><p>{client?.phone??"Телефон не вказано"}</p></article><article className="panel"><h2>Статус</h2><select value={object.status} onChange={e=>setStatus(e.target.value as ObjectStatus)}>{Object.entries(labels).map(([key,label])=><option key={key} value={key}>{label}</option>)}</select></article></section><section className="panel workflow"><h2>Робота з об’єктом</h2><div className="workflow-actions"><Link className="primary-action" href={`/constructor?object=${encodeURIComponent(id)}`}>📐 {drawing?"Відкрити замір":"Створити замір"}</Link><button type="button" disabled>🧾 Кошторис — далі</button><button type="button" disabled>📄 Документи — далі</button></div>{drawing?<div className="drawing-status">Замір збережено · {drawing.walls.length} стін · {drawing.lights.length} світильників</div>:<p className="empty">Поки немає заміру. Відкрийте конструктор.</p>}</section></main>;
+}
