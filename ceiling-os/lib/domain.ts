@@ -1,5 +1,6 @@
 export const ROLES = ['super_admin','company_owner','admin','manager','estimator','foreman','installer','accountant','warehouse_manager','production_manager','viewer'] as const;
 export type Role = typeof ROLES[number];
+export type UserRole = Role;
 
 export const OBJECT_STATUSES = ['lead','measurement','estimate','contract','deposit_paid','production','ready','delivery','installation','completed','cancelled'] as const;
 export type ObjectStatus = typeof OBJECT_STATUSES[number];
