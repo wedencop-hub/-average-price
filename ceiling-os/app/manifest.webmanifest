@@ -1,0 +1,10 @@
+{
+  "name": "СТЕЛЯ OS",
+  "short_name": "СТЕЛЯ OS",
+  "description": "Операційна система для бізнесу натяжних стель",
+  "lang": "uk",
+  "display": "standalone",
+  "start_url": "/",
+  "scope": "/",
+  "orientation": "portrait"
+}
