@@ -1,0 +1,7 @@
+export type PayrollMethod="fixed"|"percentage"|"per_m2"|"per_operation"|"per_object"|"custom_formula";
+export type PayrollRule={id:string;name:string;method:PayrollMethod;value:number;operation?:string;active:boolean};
+export type PayrollEntry={id:string;objectId:string;installerId:string;installerName:string;method:PayrollMethod;ruleId:string;base:number;rate:number;amount:number;status:"draft"|"confirmed"|"paid";createdAt:string};
+export function calculatePayroll(rule:PayrollRule, input:{objectTotal:number;areaM2:number;operations?:Record<string,number>}):number{const v=Math.max(0,rule.value);switch(rule.method){case"fixed":case"per_object":return round(v);case"percentage":return round(input.objectTotal*v/100);case"per_m2":return round(input.areaM2*v);case"per_operation":return round((input.operations?.[rule.operation??""]??0)*v);case"custom_formula":return round(Math.max(0,v));}}
+export function payrollTotal(entries:PayrollEntry[]):number{return round(entries.reduce((s,e)=>s+e.amount,0))}
+export function createPayrollEntry(objectId:string,installerId:string,installerName:string,rule:PayrollRule,input:{objectTotal:number;areaM2:number;operations?:Record<string,number>}):PayrollEntry{return{id:`payroll:${objectId}:${installerId}:${rule.id}`,objectId,installerId,installerName,method:rule.method,ruleId:rule.id,base:rule.method==="percentage"?input.objectTotal:input.areaM2,rate:rule.value,amount:calculatePayroll(rule,input),status:"draft",createdAt:new Date().toISOString()}}
+function round(v:number){return Math.round(v*100)/100}

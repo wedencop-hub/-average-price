@@ -1,0 +1,3 @@
+import{getOffline,putOffline,type OfflineRecord}from"./offline-store";import type{StockMovement}from"./warehouse-model";
+export async function getObjectConsumption(objectId:string):Promise<StockMovement[]>{const r=await getOffline<StockMovement[]>(`warehouse-object:${objectId}`);return r?.payload??[]}
+export async function saveObjectConsumption(objectId:string,movements:StockMovement[]):Promise<void>{const id=`warehouse-object:${objectId}`;const old=await getOffline<StockMovement[]>(id);const record:OfflineRecord<StockMovement[]>={id,entity:"warehouse_movement",payload:movements,version:(old?.version??0)+1,updatedAt:new Date().toISOString(),status:"pending"};await putOffline(record)}

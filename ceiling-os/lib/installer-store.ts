@@ -1,0 +1,7 @@
+import {getOffline,putOffline,type OfflineRecord} from "./offline-store";
+import type {InstallationAssignment,Installer} from "./installer-model";
+const INSTALLERS="stelya-os:installers";
+export function listInstallers(companyId:string):Installer[]{if(typeof window==="undefined")return[];try{const raw=localStorage.getItem(INSTALLERS);const all:Installer[]=raw?JSON.parse(raw):[];return all.filter(x=>x.companyId===companyId&&x.active)}catch{return[]}}
+export function seedInstallers(companyId:string,defaults:Installer[]):Installer[]{if(typeof window==="undefined")return[];const raw=localStorage.getItem(INSTALLERS);const all:Installer[]=raw?JSON.parse(raw):[];const existing=new Set(all.map(x=>x.id));const merged=[...all,...defaults.filter(x=>x.companyId===companyId&&!existing.has(x.id))];localStorage.setItem(INSTALLERS,JSON.stringify(merged));return merged.filter(x=>x.companyId===companyId&&x.active)}
+export async function getAssignments(objectId:string):Promise<InstallationAssignment[]>{const r=await getOffline<InstallationAssignment[]>(`assignment:${objectId}`);return r?.payload??[]}
+export async function saveAssignments(objectId:string,items:InstallationAssignment[]):Promise<void>{const id=`assignment:${objectId}`;const old=await getOffline<InstallationAssignment[]>(id);const record:OfflineRecord<InstallationAssignment[]>={id,entity:"installation_assignment",payload:items,version:(old?.version??0)+1,updatedAt:new Date().toISOString(),status:"pending"};await putOffline(record)}
