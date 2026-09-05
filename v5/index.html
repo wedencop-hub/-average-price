@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#07111f">
+  <title>Ціни від монтажників</title>
+  <link rel="stylesheet" href="../style.css?v=20260905-5">
+</head>
+<body>
+  <main class="app">
+    <header class="topbar"><div><div class="eyebrow">Колективний прайс монтажників України</div><h1>Ціни від монтажників</h1><p class="subtitle">Вкажіть свою ціну — система покаже середню ціну по всій групі.</p></div></header>
+    <section id="dbStatus" class="notice"><strong>Збереження</strong><span>Завантаження даних…</span></section>
+    <form id="addForm" class="searchRow"><input id="search" type="search" placeholder="Пошук позиції..." autocomplete="off"><button type="button" id="addBtn">+ Запропонувати</button></form>
+    <div class="privacy"><span>🔒</span><span><b>Анонімно для інших</b><br>Інші учасники бачать лише середню ціну, а не вашу конкретну ціну.</span></div>
+    <section id="prices" class="cards"></section><div id="empty" class="empty hidden">Нічого не знайдено.</div>
+    <section id="adminPanel" class="adminPanel hidden">
+      <div class="adminHeader"><div><div class="eyebrow">Кабінет адміністратора</div><h2>Заявки на нові позиції</h2></div><button id="adminRefresh" class="secondary">Оновити</button></div>
+      <div id="adminList" class="adminList"></div><div id="adminEmpty" class="empty">Нових заявок немає.</div>
+      <div class="adminManage"><h3>Керування прайсом</h3><div id="adminItems" class="adminItems"></div><div id="adminItemsEmpty" class="empty">Позицій немає.</div></div>
+      <div class="adminAdd"><h3>Додати позицію вручну</h3><input id="adminName" placeholder="Назва профілю / полотна"><div class="adminFields"><input id="adminCategory" placeholder="Категорія (необов'язково)"><input id="adminUnit" placeholder="Одиниця (необов'язково)"></div><button id="adminAddBtn" class="primary">Додати в прайс</button></div>
+    </section>
+    <footer><button id="adminBtn" class="adminLink hidden">🔐 Адміністратор</button><span>Прайс монтажників України · версія 2.0</span></footer>
+  </main>
+  <dialog id="modal"><form method="dialog" id="suggestForm" class="modal"><button class="close" value="cancel" aria-label="Закрити">×</button><h2>Запропонувати позицію</h2><p class="modalHint">Напишіть профіль, полотно або іншу позицію та одразу вкажіть свою ціну. Після перевірки адміністратора позиція з’явиться для голосування.</p><label>Назва позиції<input id="suggestName" required maxlength="160" placeholder="Напр. Профіль ПВХ"></label><label>Ваша ціна, грн<input id="suggestPrice" required type="number" min="10" max="5000" step="10" inputmode="numeric" placeholder="Напр. 250"></label><button class="primary" value="default">Відправити заявку</button></form></dialog>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script src="../app.js?v=20260905-5"></script>
+</body>
+</html>
