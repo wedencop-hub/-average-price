@@ -5,8 +5,32 @@ const ADMIN_ID='1454798203';
 const tg=window.Telegram?.WebApp;
 if(tg){tg.ready();tg.expand();}
 
-const {createClient}=window.supabase;
-const db=createClient(SUPABASE_URL,SUPABASE_KEY);
+// Use Supabase REST RPC directly. This avoids depending on an external
+// supabase-js CDN, which can fail to load inside Telegram's iOS WebView.
+async function rpc(functionName, body){
+  try{
+    const response=await fetch(`${SUPABASE_URL}/rest/v1/rpc/${encodeURIComponent(functionName)}`,{
+      method:'POST',
+      headers:{
+        apikey:SUPABASE_KEY,
+        Authorization:`Bearer ${SUPABASE_KEY}`,
+        'Content-Type':'application/json',
+        Accept:'application/json'
+      },
+      body:JSON.stringify(body||{})
+    });
+    const text=await response.text();
+    let data=null;
+    try{data=text?JSON.parse(text):null}catch{data=text}
+    if(!response.ok){
+      const message=typeof data==='object'&&data?.message?data.message:(typeof data==='object'&&data?.error?data.error:text||`HTTP ${response.status}`);
+      return {data:null,error:new Error(String(message))};
+    }
+    return {data,error:null};
+  }catch(error){
+    return {data:null,error};
+  }
+}
 
 const telegramUserId=tg?.initDataUnsafe?.user?.id?String(tg.initDataUnsafe.user.id):'';
 const visitorId=telegramUserId||localStorage.getItem('averagePriceVisitorId')||crypto.randomUUID();
@@ -31,11 +55,7 @@ function setBusy(text='Завантаження…'){statusBox.innerHTML=`<stron
 function stats(item){
   const mine=Number(item.my_price);
   const hasMine=Number.isFinite(mine)&&mine>0;
-  return {
-    mine:hasMine?mine:null,
-    votes:Number(item.votes_count)||0,
-    avg:Number(item.average_price)||0
-  };
+  return {mine:hasMine?mine:null,votes:Number(item.votes_count)||0,avg:Number(item.average_price)||0};
 }
 
 function render(){
@@ -59,9 +79,9 @@ function render(){
 
 async function loadPrices(){
   setBusy('Завантаження спільного прайсу…');
-  const {data,error}=await db.rpc('get_price_list',{p_telegram_user_id:visitorId});
-  if(error){console.error(error);setStatus('Не вдалося завантажити дані з бази.',false);return false;}
-  items=(data||[]).map(x=>({...x}));
+  const {data,error}=await rpc('get_price_list',{p_telegram_user_id:visitorId});
+  if(error){console.error('get_price_list',error);setStatus(`Помилка підключення: ${error.message}`,false);return false;}
+  items=Array.isArray(data)?data.map(x=>({...x})):[];
   myPrices={};
   items.forEach(x=>{if(Number(x.my_price)>0)myPrices[x.id]=Number(x.my_price)});
   render();
@@ -72,15 +92,8 @@ async function loadPrices(){
 async function savePrice(itemId,next){
   next=Math.max(0,Math.min(5000,Math.round(Number(next)/10)*10));
   setBusy('Збереження вашої ціни…');
-  const {error}=await db.rpc('submit_price_vote',{
-    p_item_id:itemId,
-    p_telegram_user_id:visitorId,
-    p_price:next
-  });
-  if(error){console.error(error);setStatus('Не вдалося зберегти ціну.',false);return;}
-  const item=items.find(x=>x.id===itemId);
-  if(item){item.my_price=next;}
-  if(next===0)delete myPrices[itemId];else myPrices[itemId]=next;
+  const {error}=await rpc('submit_price_vote',{p_item_id:itemId,p_telegram_user_id:visitorId,p_price:next});
+  if(error){console.error('submit_price_vote',error);setStatus(`Не вдалося зберегти ціну: ${error.message}`,false);return;}
   await loadPrices();
   setStatus(next===0?'Ціна прибрана з голосування.':'Вашу ціну збережено.');
 }
@@ -99,7 +112,6 @@ prices.addEventListener('input',e=>{
 });
 prices.addEventListener('change',e=>{const s=e.target.closest('.priceSlider');if(s)savePrice(s.dataset.id,Number(s.value))});
 
-// New position suggestion is stored in the shared Supabase database.
 document.querySelector('#addBtn').onclick=()=>modal.showModal();
 document.querySelector('#suggestForm').addEventListener('submit',async e=>{
   e.preventDefault();
@@ -107,12 +119,8 @@ document.querySelector('#suggestForm').addEventListener('submit',async e=>{
   const price=Number(document.querySelector('#suggestPrice').value);
   if(name.length<2||!Number.isInteger(price)||price<10||price>5000||price%10!==0)return;
   setBusy('Відправлення заявки…');
-  const {error}=await db.rpc('submit_price_suggestion',{
-    p_text:name,
-    p_telegram_user_id:visitorId,
-    p_proposed_price:price
-  });
-  if(error){console.error(error);setStatus('Не вдалося відправити заявку.',false);return;}
+  const {error}=await rpc('submit_price_suggestion',{p_text:name,p_telegram_user_id:visitorId,p_proposed_price:price});
+  if(error){console.error('submit_price_suggestion',error);setStatus(`Не вдалося відправити заявку: ${error.message}`,false);return;}
   e.target.reset();modal.close();
   setStatus('Заявку збережено. Після перевірки адміністратора позиція зʼявиться у прайсі.');
   if(isAdmin)loadAdminSuggestions();
@@ -124,9 +132,9 @@ if(isAdmin){adminBtn.classList.remove('hidden');adminBtn.onclick=showAdmin}
 async function loadAdminSuggestions(){
   if(!isAdmin)return;
   const list=document.querySelector('#adminList'),empty=document.querySelector('#adminEmpty');
-  const {data,error}=await db.rpc('admin_list_price_suggestions',{p_admin_code:telegramUserId});
-  if(error){console.error(error);list.innerHTML='';empty.classList.remove('hidden');empty.textContent='Не вдалося завантажити заявки.';return;}
-  const pending=data||[];
+  const {data,error}=await rpc('admin_list_price_suggestions',{p_admin_code:telegramUserId});
+  if(error){console.error('admin_list_price_suggestions',error);list.innerHTML='';empty.classList.remove('hidden');empty.textContent=`Не вдалося завантажити заявки: ${error.message}`;return;}
+  const pending=Array.isArray(data)?data:[];
   list.innerHTML='';empty.classList.toggle('hidden',pending.length>0);empty.textContent='Нових заявок немає.';
   pending.forEach(s=>{const el=document.createElement('div');el.className='request';el.innerHTML=`<div><b>${esc(s.text)}</b><div class="requestMeta">Заявка · ${new Date(s.created_at).toLocaleString('uk-UA')} · ${s.proposed_price?money(s.proposed_price)+' грн':'без ціни'}</div></div><div class="requestActions"><button class="accept" data-id="${s.id}">Додати в прайс</button><button class="reject" data-id="${s.id}">Відхилити</button></div>`;list.appendChild(el)})
 }
@@ -134,9 +142,9 @@ async function loadAdminSuggestions(){
 async function loadAdminItems(){
   if(!isAdmin)return;
   const box=document.querySelector('#adminItems'),empty=document.querySelector('#adminItemsEmpty');
-  const {data,error}=await db.rpc('admin_list_price_items',{p_admin_code:telegramUserId});
-  if(error){console.error(error);box.innerHTML='';empty.classList.remove('hidden');empty.textContent='Не вдалося завантажити позиції.';return;}
-  const rows=data||[];
+  const {data,error}=await rpc('admin_list_price_items',{p_admin_code:telegramUserId});
+  if(error){console.error('admin_list_price_items',error);box.innerHTML='';empty.classList.remove('hidden');empty.textContent=`Не вдалося завантажити позиції: ${error.message}`;return;}
+  const rows=Array.isArray(data)?data:[];
   box.innerHTML='';empty.classList.toggle('hidden',rows.length>0);empty.textContent='Позицій немає.';
   rows.forEach(x=>{const el=document.createElement('div');el.className='adminItem';el.innerHTML=`<div><b>${esc(x.name)}</b><span>${esc([x.category,x.unit].filter(Boolean).join(' · '))}</span></div><button class="deleteItem" data-id="${x.id}">Видалити</button>`;box.appendChild(el)})
 }
@@ -149,11 +157,11 @@ document.querySelector('#adminList').addEventListener('click',async e=>{
   setBusy('Обробка заявки…');
   let error=null;
   if(b.classList.contains('accept')){
-    ({error}=await db.rpc('admin_accept_price_suggestion',{p_admin_code:telegramUserId,p_suggestion_id:id}));
+    ({error}=await rpc('admin_accept_price_suggestion',{p_admin_code:telegramUserId,p_suggestion_id:id}));
   }else if(b.classList.contains('reject')){
-    ({error}=await db.rpc('admin_reject_price_suggestion',{p_admin_code:telegramUserId,p_suggestion_id:id}));
+    ({error}=await rpc('admin_reject_price_suggestion',{p_admin_code:telegramUserId,p_suggestion_id:id}));
   }
-  if(error){console.error(error);setStatus('Не вдалося обробити заявку.',false);return;}
+  if(error){console.error('admin suggestion action',error);setStatus(`Не вдалося обробити заявку: ${error.message}`,false);return;}
   await Promise.all([loadPrices(),loadAdminSuggestions(),loadAdminItems()]);
   setStatus('Зміни збережено у спільній базі.');
 });
@@ -162,8 +170,8 @@ document.querySelector('#adminItems').addEventListener('click',async e=>{
   const b=e.target.closest('.deleteItem');if(!b)return;
   if(!confirm('Видалити цю позицію з прайсу?'))return;
   setBusy('Видалення позиції…');
-  const {error}=await db.rpc('admin_delete_price_item',{p_admin_code:telegramUserId,p_item_id:b.dataset.id});
-  if(error){console.error(error);setStatus('Не вдалося видалити позицію.',false);return;}
+  const {error}=await rpc('admin_delete_price_item',{p_admin_code:telegramUserId,p_item_id:b.dataset.id});
+  if(error){console.error('admin_delete_price_item',error);setStatus(`Не вдалося видалити позицію: ${error.message}`,false);return;}
   await Promise.all([loadPrices(),loadAdminItems()]);
   setStatus('Позицію видалено зі спільного прайсу.');
 });
@@ -171,17 +179,21 @@ document.querySelector('#adminItems').addEventListener('click',async e=>{
 document.querySelector('#adminAddBtn').onclick=async()=>{
   const name=document.querySelector('#adminName').value.trim();if(name.length<2)return;
   setBusy('Додавання позиції…');
-  const {error}=await db.rpc('admin_add_price_item',{
+  const {error}=await rpc('admin_add_price_item',{
     p_admin_code:telegramUserId,
     p_name:name,
     p_category:document.querySelector('#adminCategory').value.trim()||null,
     p_unit:document.querySelector('#adminUnit').value.trim()||null
   });
-  if(error){console.error(error);setStatus('Не вдалося додати позицію.',false);return;}
+  if(error){console.error('admin_add_price_item',error);setStatus(`Не вдалося додати позицію: ${error.message}`,false);return;}
   document.querySelector('#adminName').value='';document.querySelector('#adminCategory').value='';document.querySelector('#adminUnit').value='';
   await Promise.all([loadPrices(),loadAdminItems()]);
   setStatus('Позицію додано у спільний прайс.');
 };
 
 search.addEventListener('input',render);
+
+window.addEventListener('error',e=>{console.error(e.error||e.message);setStatus(`Помилка додатку: ${e.message||'невідома помилка'}`,false)});
+window.addEventListener('unhandledrejection',e=>{console.error(e.reason);setStatus(`Помилка додатку: ${e.reason?.message||'невідома помилка'}`,false)});
+
 loadPrices();
