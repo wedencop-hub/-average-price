@@ -1,31 +1,20 @@
+const SUPABASE_URL='https://usggjqukcqzttrilgmmo.supabase.co';
+const SUPABASE_KEY='sb_publishable_g3Hi1tMxV4sV5bYXBpijBA_nHFd0zxA';
 const ADMIN_ID='1454798203';
+
 const tg=window.Telegram?.WebApp;
 if(tg){tg.ready();tg.expand();}
 
-// GitHub Pages-only version: all runtime data is stored in this browser's localStorage.
+const {createClient}=window.supabase;
+const db=createClient(SUPABASE_URL,SUPABASE_KEY);
+
 const telegramUserId=tg?.initDataUnsafe?.user?.id?String(tg.initDataUnsafe.user.id):'';
 const visitorId=telegramUserId||localStorage.getItem('averagePriceVisitorId')||crypto.randomUUID();
-localStorage.setItem('averagePriceVisitorId',visitorId);
+if(!telegramUserId)localStorage.setItem('averagePriceVisitorId',visitorId);
 const isAdmin=telegramUserId===ADMIN_ID;
 
-const ITEMS_KEY='averagePriceItemsV2';
-const VOTES_KEY='averagePriceMyVotesV2';
-const SUGGESTIONS_KEY='averagePriceSuggestionsV2';
-
-const seed=[
-  {id:'msd-320',name:'Плівка MSD 3.20 м',category:'Полотно',unit:'м²',baseAvg:1340,baseVotes:42},
-  {id:'msd-500',name:'Плівка MSD 5.00 м',category:'Полотно',unit:'м²',baseAvg:1720,baseVotes:37},
-  {id:'pvc-wall',name:'Профіль ПВХ стіна',category:'Профіль',unit:'м.п.',baseAvg:98,baseVotes:31},
-  {id:'shadow',name:'Тіньовий профіль',category:'Профіль',unit:'м.п.',baseAvg:195,baseVotes:24},
-  {id:'lamp-platform',name:'Платформа під люстру',category:'Комплектуючі',unit:'шт.',baseAvg:135,baseVotes:18}
-];
-
-function read(key,fallback){try{const x=JSON.parse(localStorage.getItem(key));return x??fallback}catch{return fallback}}
-function write(key,value){localStorage.setItem(key,JSON.stringify(value))}
-let items=read(ITEMS_KEY,null);
-if(!Array.isArray(items)){items=seed;write(ITEMS_KEY,items)}
-let myPrices=read(VOTES_KEY,{});
-let suggestions=read(SUGGESTIONS_KEY,[]);
+let items=[];
+let myPrices={};
 
 const prices=document.querySelector('#prices');
 const search=document.querySelector('#search');
@@ -35,15 +24,18 @@ const adminPanel=document.querySelector('#adminPanel');
 const adminBtn=document.querySelector('#adminBtn');
 
 function money(n){return new Intl.NumberFormat('uk-UA').format(Math.round(Number(n)||0))}
-function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
-function setStatus(text,ok=true){statusBox.innerHTML=`<strong>${ok?'Збережено на пристрої':'Увага'}</strong><span>${esc(text)}</span>`;statusBox.classList.toggle('ok',!!ok)}
-function uid(prefix='id'){return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2,8)}`}
+function esc(s){return String(s??'').replace(/[&<>\"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'}[c]))}
+function setStatus(text,ok=true){statusBox.innerHTML=`<strong>${ok?'Збереження':'Увага'}</strong><span>${esc(text)}</span>`;statusBox.classList.toggle('ok',!!ok)}
+function setBusy(text='Завантаження…'){statusBox.innerHTML=`<strong>Збереження</strong><span>${esc(text)}</span>`;statusBox.classList.remove('ok')}
+
 function stats(item){
-  const mine=Number(myPrices[item.id]);
+  const mine=Number(item.my_price);
   const hasMine=Number.isFinite(mine)&&mine>0;
-  const n=Number(item.baseVotes)||0;
-  const sum=(Number(item.baseAvg)||0)*n;
-  return {mine:hasMine?mine:null,votes:n+(hasMine?1:0),avg:(sum+(hasMine?mine:0))/(n+(hasMine?1:0)||1)};
+  return {
+    mine:hasMine?mine:null,
+    votes:Number(item.votes_count)||0,
+    avg:Number(item.average_price)||0
+  };
 }
 
 function render(){
@@ -65,12 +57,31 @@ function render(){
   }
 }
 
-function savePrice(itemId,next){
-  next=Math.max(0,Math.min(5000,Math.round(Number(next)/10)*10));
-  if(next===0) delete myPrices[itemId];
-  else myPrices[itemId]=next;
-  write(VOTES_KEY,myPrices);
+async function loadPrices(){
+  setBusy('Завантаження спільного прайсу…');
+  const {data,error}=await db.rpc('get_price_list',{p_telegram_user_id:visitorId});
+  if(error){console.error(error);setStatus('Не вдалося завантажити дані з бази.',false);return false;}
+  items=(data||[]).map(x=>({...x}));
+  myPrices={};
+  items.forEach(x=>{if(Number(x.my_price)>0)myPrices[x.id]=Number(x.my_price)});
   render();
+  setStatus('Дані синхронізовано зі спільною базою.');
+  return true;
+}
+
+async function savePrice(itemId,next){
+  next=Math.max(0,Math.min(5000,Math.round(Number(next)/10)*10));
+  setBusy('Збереження вашої ціни…');
+  const {error}=await db.rpc('submit_price_vote',{
+    p_item_id:itemId,
+    p_telegram_user_id:visitorId,
+    p_price:next
+  });
+  if(error){console.error(error);setStatus('Не вдалося зберегти ціну.',false);return;}
+  const item=items.find(x=>x.id===itemId);
+  if(item){item.my_price=next;}
+  if(next===0)delete myPrices[itemId];else myPrices[itemId]=next;
+  await loadPrices();
   setStatus(next===0?'Ціна прибрана з голосування.':'Вашу ціну збережено.');
 }
 
@@ -88,61 +99,89 @@ prices.addEventListener('input',e=>{
 });
 prices.addEventListener('change',e=>{const s=e.target.closest('.priceSlider');if(s)savePrice(s.dataset.id,Number(s.value))});
 
-// Suggestion: saved locally. The initial price becomes the user's first vote when accepted locally by admin.
+// New position suggestion is stored in the shared Supabase database.
 document.querySelector('#addBtn').onclick=()=>modal.showModal();
-document.querySelector('#suggestForm').addEventListener('submit',e=>{
+document.querySelector('#suggestForm').addEventListener('submit',async e=>{
   e.preventDefault();
   const name=document.querySelector('#suggestName').value.trim();
   const price=Number(document.querySelector('#suggestPrice').value);
   if(name.length<2||!Number.isInteger(price)||price<10||price>5000||price%10!==0)return;
-  suggestions.unshift({id:uid('suggestion'),text:name,proposed_price:price,visitorId,created_at:new Date().toISOString(),status:'pending'});
-  write(SUGGESTIONS_KEY,suggestions);
+  setBusy('Відправлення заявки…');
+  const {error}=await db.rpc('submit_price_suggestion',{
+    p_text:name,
+    p_telegram_user_id:visitorId,
+    p_proposed_price:price
+  });
+  if(error){console.error(error);setStatus('Не вдалося відправити заявку.',false);return;}
   e.target.reset();modal.close();
-  setStatus('Заявку збережено на цьому пристрої.');
+  setStatus('Заявку збережено. Після перевірки адміністратора позиція зʼявиться у прайсі.');
   if(isAdmin)loadAdminSuggestions();
 });
 
 function showAdmin(){adminPanel.classList.remove('hidden');loadAdminSuggestions();loadAdminItems();adminPanel.scrollIntoView({behavior:'smooth',block:'start'})}
 if(isAdmin){adminBtn.classList.remove('hidden');adminBtn.onclick=showAdmin}
 
-function loadAdminSuggestions(){
+async function loadAdminSuggestions(){
   if(!isAdmin)return;
   const list=document.querySelector('#adminList'),empty=document.querySelector('#adminEmpty');
-  const pending=suggestions.filter(s=>s.status==='pending');
-  list.innerHTML='';empty.classList.toggle('hidden',pending.length>0);
-  pending.forEach(s=>{const el=document.createElement('div');el.className='request';el.innerHTML=`<div><b>${esc(s.text)}</b><div class="requestMeta">Заявка · ${new Date(s.created_at).toLocaleString('uk-UA')} · ${money(s.proposed_price)} грн</div></div><div class="requestActions"><button class="accept" data-id="${s.id}">Додати в прайс</button><button class="reject" data-id="${s.id}">Відхилити</button></div>`;list.appendChild(el)})
+  const {data,error}=await db.rpc('admin_list_price_suggestions',{p_admin_code:telegramUserId});
+  if(error){console.error(error);list.innerHTML='';empty.classList.remove('hidden');empty.textContent='Не вдалося завантажити заявки.';return;}
+  const pending=data||[];
+  list.innerHTML='';empty.classList.toggle('hidden',pending.length>0);empty.textContent='Нових заявок немає.';
+  pending.forEach(s=>{const el=document.createElement('div');el.className='request';el.innerHTML=`<div><b>${esc(s.text)}</b><div class="requestMeta">Заявка · ${new Date(s.created_at).toLocaleString('uk-UA')} · ${s.proposed_price?money(s.proposed_price)+' грн':'без ціни'}</div></div><div class="requestActions"><button class="accept" data-id="${s.id}">Додати в прайс</button><button class="reject" data-id="${s.id}">Відхилити</button></div>`;list.appendChild(el)})
 }
-function loadAdminItems(){
+
+async function loadAdminItems(){
   if(!isAdmin)return;
   const box=document.querySelector('#adminItems'),empty=document.querySelector('#adminItemsEmpty');
-  box.innerHTML='';empty.classList.toggle('hidden',items.length>0);
-  items.forEach(x=>{const el=document.createElement('div');el.className='adminItem';el.innerHTML=`<div><b>${esc(x.name)}</b><span>${esc([x.category,x.unit].filter(Boolean).join(' · '))}</span></div><button class="deleteItem" data-id="${x.id}">Видалити</button>`;box.appendChild(el)})
+  const {data,error}=await db.rpc('admin_list_price_items',{p_admin_code:telegramUserId});
+  if(error){console.error(error);box.innerHTML='';empty.classList.remove('hidden');empty.textContent='Не вдалося завантажити позиції.';return;}
+  const rows=data||[];
+  box.innerHTML='';empty.classList.toggle('hidden',rows.length>0);empty.textContent='Позицій немає.';
+  rows.forEach(x=>{const el=document.createElement('div');el.className='adminItem';el.innerHTML=`<div><b>${esc(x.name)}</b><span>${esc([x.category,x.unit].filter(Boolean).join(' · '))}</span></div><button class="deleteItem" data-id="${x.id}">Видалити</button>`;box.appendChild(el)})
 }
-document.querySelector('#adminRefresh').onclick=()=>{loadAdminSuggestions();loadAdminItems()};
-document.querySelector('#adminList').addEventListener('click',e=>{
+
+document.querySelector('#adminRefresh').onclick=async()=>{setBusy('Оновлення…');await Promise.all([loadPrices(),loadAdminSuggestions(),loadAdminItems()]);};
+
+document.querySelector('#adminList').addEventListener('click',async e=>{
   const b=e.target.closest('button');if(!b)return;
-  const s=suggestions.find(x=>x.id===b.dataset.id);if(!s)return;
+  const id=b.dataset.id;if(!id)return;
+  setBusy('Обробка заявки…');
+  let error=null;
   if(b.classList.contains('accept')){
-    const id=uid('item');
-    items.push({id,name:s.text,category:'',unit:'',baseAvg:0,baseVotes:0});
-    // If the admin is accepting their own submitted item, its proposed price is immediately their vote.
-    if(s.visitorId===visitorId&&s.proposed_price>0)myPrices[id]=s.proposed_price;
-    s.status='accepted';write(ITEMS_KEY,items);write(VOTES_KEY,myPrices);
-  }else{s.status='rejected'}
-  write(SUGGESTIONS_KEY,suggestions);loadAdminSuggestions();loadAdminItems();render();
+    ({error}=await db.rpc('admin_accept_price_suggestion',{p_admin_code:telegramUserId,p_suggestion_id:id}));
+  }else if(b.classList.contains('reject')){
+    ({error}=await db.rpc('admin_reject_price_suggestion',{p_admin_code:telegramUserId,p_suggestion_id:id}));
+  }
+  if(error){console.error(error);setStatus('Не вдалося обробити заявку.',false);return;}
+  await Promise.all([loadPrices(),loadAdminSuggestions(),loadAdminItems()]);
+  setStatus('Зміни збережено у спільній базі.');
 });
-document.querySelector('#adminItems').addEventListener('click',e=>{
+
+document.querySelector('#adminItems').addEventListener('click',async e=>{
   const b=e.target.closest('.deleteItem');if(!b)return;
   if(!confirm('Видалити цю позицію з прайсу?'))return;
-  items=items.filter(x=>x.id!==b.dataset.id);delete myPrices[b.dataset.id];
-  write(ITEMS_KEY,items);write(VOTES_KEY,myPrices);loadAdminItems();render();
+  setBusy('Видалення позиції…');
+  const {error}=await db.rpc('admin_delete_price_item',{p_admin_code:telegramUserId,p_item_id:b.dataset.id});
+  if(error){console.error(error);setStatus('Не вдалося видалити позицію.',false);return;}
+  await Promise.all([loadPrices(),loadAdminItems()]);
+  setStatus('Позицію видалено зі спільного прайсу.');
 });
-document.querySelector('#adminAddBtn').onclick=()=>{
+
+document.querySelector('#adminAddBtn').onclick=async()=>{
   const name=document.querySelector('#adminName').value.trim();if(name.length<2)return;
-  items.push({id:uid('item'),name,category:document.querySelector('#adminCategory').value.trim(),unit:document.querySelector('#adminUnit').value.trim(),baseAvg:0,baseVotes:0});
-  write(ITEMS_KEY,items);document.querySelector('#adminName').value='';document.querySelector('#adminCategory').value='';document.querySelector('#adminUnit').value='';loadAdminItems();render();
+  setBusy('Додавання позиції…');
+  const {error}=await db.rpc('admin_add_price_item',{
+    p_admin_code:telegramUserId,
+    p_name:name,
+    p_category:document.querySelector('#adminCategory').value.trim()||null,
+    p_unit:document.querySelector('#adminUnit').value.trim()||null
+  });
+  if(error){console.error(error);setStatus('Не вдалося додати позицію.',false);return;}
+  document.querySelector('#adminName').value='';document.querySelector('#adminCategory').value='';document.querySelector('#adminUnit').value='';
+  await Promise.all([loadPrices(),loadAdminItems()]);
+  setStatus('Позицію додано у спільний прайс.');
 };
 
 search.addEventListener('input',render);
-setStatus('Дані працюють без Supabase — зберігаються в памʼяті браузера.');
-render();
+loadPrices();
